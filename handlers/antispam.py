@@ -1,7 +1,8 @@
 import re
 import time
+from datetime import timedelta
 
-from telegram import Update
+from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
 
 import config
@@ -18,10 +19,27 @@ async def antispam_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = message.from_user
     text = message.text
 
-    # 管理员不受限制
+    # 管理员和匿名管理员不受限制
+    if user.id == 1087968824:
+        return
     member = await message.chat.get_member(user.id)
     if member.status in ("administrator", "creator"):
         return
+
+    # 检查广告关键词
+    for keyword in config.AD_KEYWORDS:
+        if keyword in text:
+            try:
+                await message.delete()
+                until = message.date + timedelta(minutes=config.AD_MUTE_MINUTES)
+                permissions = ChatPermissions(can_send_messages=False)
+                await message.chat.restrict_member(user.id, permissions, until_date=until)
+                await message.chat.send_message(
+                    f"🚫 {user.full_name} 因发送广告已被禁言 {config.AD_MUTE_MINUTES} 分钟。"
+                )
+            except Exception:
+                pass
+            return
 
     # 检查敏感词
     for word in config.ANTISPAM["banned_words"]:
