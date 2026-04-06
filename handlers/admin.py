@@ -21,22 +21,43 @@ def _get_target_user(update: Update):
     return None
 
 
+async def _delete_command(update: Update):
+    """删除管理员的命令消息"""
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+
+async def _reply_and_delete(update: Update, text: str, delay: int = 5):
+    """发送提示消息并在几秒后自动删除"""
+    import asyncio
+    msg = await update.effective_chat.send_message(text)
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/ban — 踢出并封禁用户（需回复目标用户的消息）"""
     if not await _is_admin(update, context):
         await update.message.reply_text("⚠️ 仅管理员可使用此命令。")
         return
 
+    await _delete_command(update)
+
     target = _get_target_user(update)
     if not target:
-        await update.message.reply_text("请回复要封禁的用户的消息。")
+        await _reply_and_delete(update, "请回复要封禁的用户的消息。")
         return
 
     try:
         await update.effective_chat.ban_member(target.id)
-        await update.message.reply_text(f"✅ 已封禁用户 {target.full_name}。")
+        await _reply_and_delete(update, f"✅ 已封禁用户 {target.full_name}。")
     except Exception as e:
-        await update.message.reply_text(f"❌ 操作失败：{e}")
+        await _reply_and_delete(update, f"❌ 操作失败：{e}")
 
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -45,9 +66,11 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ 仅管理员可使用此命令。")
         return
 
+    await _delete_command(update)
+
     target = _get_target_user(update)
     if not target:
-        await update.message.reply_text("请回复要禁言的用户的消息。")
+        await _reply_and_delete(update, "请回复要禁言的用户的消息。")
         return
 
     # 解析禁言时长
@@ -62,9 +85,9 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         until = update.message.date + timedelta(minutes=minutes)
         permissions = ChatPermissions(can_send_messages=False)
         await update.effective_chat.restrict_member(target.id, permissions, until_date=until)
-        await update.message.reply_text(f"🔇 已禁言 {target.full_name} {minutes} 分钟。")
+        await _reply_and_delete(update, f"🔇 已禁言 {target.full_name} {minutes} 分钟。")
     except Exception as e:
-        await update.message.reply_text(f"❌ 操作失败：{e}")
+        await _reply_and_delete(update, f"❌ 操作失败：{e}")
 
 
 async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,9 +96,11 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ 仅管理员可使用此命令。")
         return
 
+    await _delete_command(update)
+
     target = _get_target_user(update)
     if not target:
-        await update.message.reply_text("请回复要解除禁言的用户的消息。")
+        await _reply_and_delete(update, "请回复要解除禁言的用户的消息。")
         return
 
     try:
@@ -85,9 +110,9 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_add_web_page_previews=True,
         )
         await update.effective_chat.restrict_member(target.id, permissions)
-        await update.message.reply_text(f"🔊 已解除 {target.full_name} 的禁言。")
+        await _reply_and_delete(update, f"🔊 已解除 {target.full_name} 的禁言。")
     except Exception as e:
-        await update.message.reply_text(f"❌ 操作失败：{e}")
+        await _reply_and_delete(update, f"❌ 操作失败：{e}")
 
 
 async def show_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,13 +128,15 @@ async def set_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ 仅管理员可使用此命令。")
         return
 
+    await _delete_command(update)
+
     if not context.args:
-        await update.message.reply_text("用法：/setrules <规则内容>")
+        await _reply_and_delete(update, "用法：/setrules <规则内容>")
         return
 
     new_rules = " ".join(context.args)
     context.bot_data["custom_rules"] = new_rules
-    await update.message.reply_text("✅ 群规则已更新。")
+    await _reply_and_delete(update, "✅ 群规则已更新。")
 
 
 async def send_ad(update: Update, context: ContextTypes.DEFAULT_TYPE):
