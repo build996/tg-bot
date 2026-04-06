@@ -10,7 +10,7 @@ from telegram.ext import (
 import config
 from handlers.welcome import welcome_new_member
 from handlers.keyword import keyword_reply
-from handlers.admin import ban_user, mute_user, unmute_user, show_rules, set_rules
+from handlers.admin import ban_user, mute_user, unmute_user, show_rules, set_rules, send_ad
 from handlers.antispam import antispam_filter
 
 # 日志配置
@@ -33,6 +33,7 @@ def main():
     app.add_handler(CommandHandler("unmute", unmute_user))
     app.add_handler(CommandHandler("rules", show_rules))
     app.add_handler(CommandHandler("setrules", set_rules))
+    app.add_handler(CommandHandler("ad", send_ad))
 
     # 反垃圾过滤（优先级高，group=0）
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, antispam_filter), group=0)

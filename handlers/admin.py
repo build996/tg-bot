@@ -110,3 +110,30 @@ async def set_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_rules = " ".join(context.args)
     context.bot_data["custom_rules"] = new_rules
     await update.message.reply_text("✅ 群规则已更新。")
+
+
+async def send_ad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/ad <内容> — 发送格式化广告消息（仅管理员）"""
+    if not await _is_admin(update, context):
+        await update.message.reply_text("⚠️ 仅管理员可使用此命令。")
+        return
+
+    if not context.args:
+        await update.message.reply_text("用法：/ad <广告内容>")
+        return
+
+    ad_content = " ".join(context.args)
+    ad_message = (
+        "📢 <b>公告</b>\n"
+        "━━━━━━━━━━━━━━\n"
+        f"{ad_content}\n"
+        "━━━━━━━━━━━━━━"
+    )
+
+    try:
+        # 删除管理员的命令消息
+        await update.message.delete()
+        # 发送格式化广告
+        await update.effective_chat.send_message(ad_message, parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"❌ 发送失败：{e}")
