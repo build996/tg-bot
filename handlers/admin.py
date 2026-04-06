@@ -7,8 +7,11 @@ import config
 
 
 async def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """检查命令调用者是否为群管理员"""
+    """检查命令调用者是否为群管理员（支持匿名管理员）"""
     user = update.effective_user
+    # 匿名管理员的固定 ID
+    if user.id == 1087968824:
+        return True
     chat = update.effective_chat
     member = await chat.get_member(user.id)
     return member.status in ("administrator", "creator")
