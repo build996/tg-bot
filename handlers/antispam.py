@@ -10,8 +10,30 @@ import config
 URL_PATTERN = re.compile(r'https?://\S+|www\.\S+', re.IGNORECASE)
 
 
+async def _is_admin_user(message, user) -> bool:
+    """检查用户是否为管理员"""
+    if user.id == 1087968824:
+        return True
+    member = await message.chat.get_member(user.id)
+    return member.status in ("administrator", "creator")
+
+
+async def _delete_and_mute(message, user, reason: str, minutes: int):
+    """删除消息并禁言"""
+    try:
+        await message.delete()
+        until = message.date + timedelta(minutes=minutes)
+        permissions = ChatPermissions(can_send_messages=False)
+        await message.chat.restrict_member(user.id, permissions, until_date=until)
+        await message.chat.send_message(
+            f"🚫 {user.full_name} {reason}，已被禁言 {minutes} 分钟。"
+        )
+    except Exception:
+        pass
+
+
 async def antispam_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """反垃圾消息过滤"""
+    """反垃圾消息过滤（文本消息）"""
     if not update.message or not update.message.text:
         return
 
@@ -19,26 +41,20 @@ async def antispam_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = message.from_user
     text = message.text
 
-    # 管理员和匿名管理员不受限制
-    if user.id == 1087968824:
+    # 管理员不受限制
+    if await _is_admin_user(message, user):
         return
-    member = await message.chat.get_member(user.id)
-    if member.status in ("administrator", "creator"):
+
+    # 检查链接（普通成员禁止发任何链接）
+    links = URL_PATTERN.findall(text)
+    if links:
+        await _delete_and_mute(message, user, "因发送链接", config.AD_MUTE_MINUTES)
         return
 
     # 检查广告关键词
     for keyword in config.AD_KEYWORDS:
         if keyword in text:
-            try:
-                await message.delete()
-                until = message.date + timedelta(minutes=config.AD_MUTE_MINUTES)
-                permissions = ChatPermissions(can_send_messages=False)
-                await message.chat.restrict_member(user.id, permissions, until_date=until)
-                await message.chat.send_message(
-                    f"🚫 {user.full_name} 因发送广告已被禁言 {config.AD_MUTE_MINUTES} 分钟。"
-                )
-            except Exception:
-                pass
+            await _delete_and_mute(message, user, "因发送广告", config.AD_MUTE_MINUTES)
             return
 
     # 检查敏感词
@@ -53,31 +69,28 @@ async def antispam_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             return
 
-    # 检查链接数量
-    links = URL_PATTERN.findall(text)
-    max_links = config.ANTISPAM["max_links_per_message"]
-    if len(links) > max_links:
-        try:
-            await message.delete()
-            await message.chat.send_message(
-                f"⚠️ {user.full_name} 的消息因包含过多链接已被删除（最多 {max_links} 个）。"
-            )
-        except Exception:
-            pass
+
+async def antispam_photo_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """过滤二维码图片（含图片/贴纸的消息）"""
+    if not update.message:
         return
 
-    # 新成员链接限制
-    new_members = context.bot_data.get("new_members", {})
-    join_time = new_members.get(user.id)
-    if join_time and links:
-        cooldown = config.ANTISPAM["new_member_link_cooldown"]
-        if time.time() - join_time < cooldown:
-            try:
-                await message.delete()
-                remaining = int(cooldown - (time.time() - join_time))
-                await message.chat.send_message(
-                    f"⚠️ {user.full_name}，新成员在加入 {cooldown // 60} 分钟内不能发送链接。"
-                    f"请 {remaining} 秒后再试。"
-                )
-            except Exception:
-                pass
+    message = update.message
+    user = message.from_user
+
+    # 管理员不受限制
+    if await _is_admin_user(message, user):
+        return
+
+    # 检查消息中的图片说明文字是否包含广告关键词
+    caption = message.caption or ""
+    for keyword in config.AD_KEYWORDS:
+        if keyword in caption:
+            await _delete_and_mute(message, user, "因发送广告", config.AD_MUTE_MINUTES)
+            return
+
+    # 检查图片说明中的链接
+    links = URL_PATTERN.findall(caption)
+    if links:
+        await _delete_and_mute(message, user, "因发送链接", config.AD_MUTE_MINUTES)
+        return
