@@ -12,6 +12,7 @@ from handlers.welcome import welcome_new_member
 from handlers.keyword import keyword_reply
 from handlers.admin import ban_user, mute_user, unmute_user, show_rules, set_rules, send_ad
 from handlers.antispam import antispam_filter, antispam_photo_filter
+from handlers.whitelist import add_whitelist, remove_whitelist, list_whitelist, init_whitelist
 
 # 日志配置
 logging.basicConfig(
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 def main():
     app = ApplicationBuilder().token(config.TOKEN).build()
 
+    # 启动时把磁盘上的运行时广告白名单加载到 bot_data
+    init_whitelist(app.bot_data)
+
     # 新成员欢迎
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
 
@@ -34,6 +38,9 @@ def main():
     app.add_handler(CommandHandler("rules", show_rules))
     app.add_handler(CommandHandler("setrules", set_rules))
     app.add_handler(CommandHandler("ad", send_ad))
+    app.add_handler(CommandHandler("whitelist", add_whitelist))
+    app.add_handler(CommandHandler("unwhitelist", remove_whitelist))
+    app.add_handler(CommandHandler("whitelisted", list_whitelist))
 
     # 反垃圾过滤（优先级高，group=0）
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, antispam_filter), group=0)

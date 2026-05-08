@@ -6,6 +6,7 @@ from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
 
 import config
+from handlers.whitelist import is_whitelisted as _is_ad_whitelisted
 
 URL_PATTERN = re.compile(r'https?://\S+|www\.\S+', re.IGNORECASE)
 
@@ -45,6 +46,10 @@ async def antispam_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await _is_admin_user(message, user):
         return
 
+    # 广告白名单用户不受限制
+    if _is_ad_whitelisted(user, context):
+        return
+
     # 检查链接（普通成员禁止发任何链接）
     links = URL_PATTERN.findall(text)
     if links:
@@ -80,6 +85,10 @@ async def antispam_photo_filter(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 管理员不受限制
     if await _is_admin_user(message, user):
+        return
+
+    # 广告白名单用户不受限制
+    if _is_ad_whitelisted(user, context):
         return
 
     # 检查消息中的图片说明文字是否包含广告关键词
